@@ -9,16 +9,28 @@ import (
 	polygon "github.com/polygon-io/client-go/rest"
 )
 
-type InMemoryTransactionStore struct{}
+func NewInMemoryTransactionStore() *InMemoryTransactionStore {
+	return &InMemoryTransactionStore{map[string]string{}, nil}
+}
 
-func (i *InMemoryTransactionStore) GetTransactions(name string) string {
-	return "dsanklfnslaknfksa"
+type InMemoryTransactionStore struct {
+	store    map[string]string
+	altCalls []string
+}
+
+func (i *InMemoryTransactionStore) GetTransactions(transaction string) string {
+	return i.store[transaction]
+}
+
+func (i *InMemoryTransactionStore) ProcessTransaction(transaction string) {
+	i.altCalls = append(i.altCalls, transaction)
 }
 
 func main() {
 	c := polygon.New(config.GetAPIKey())
 	_ = c
 
-	server := &TicketServer{&InMemoryTransactionStore{}}
+	server := &TicketServer{NewInMemoryTransactionStore()}
+	log.Print("Local server on port :5000")
 	log.Fatal(http.ListenAndServe(":5000", server))
 }

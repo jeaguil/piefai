@@ -1,10 +1,23 @@
+/*
+TESTS FOR TickerServer;
+server := &TicketServer{NewInMemoryTickerStore()}
+
+Handles func for TickerStore:
+	GetTicker
+	ProcessTicker
+*/
+
 package main
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 type StubTicketStore struct {
@@ -13,12 +26,12 @@ type StubTicketStore struct {
 }
 
 // Gets history of transactions on a given date
-func (s *StubTicketStore) GetTransactions(date string) string {
+func (s *StubTicketStore) GetTicker(date string) string {
 	return s.transactions[date]
 }
 
-func (s *StubTicketStore) ProcessTransaction(alt string) {
-	s.altCalls = append(s.altCalls, alt)
+func (s *StubTicketStore) ProcessTicker(date, alt string) {
+	s.altCalls = append(s.altCalls, date)
 }
 
 // Testing Store:
@@ -40,7 +53,7 @@ var response = httptest.NewRecorder()
 func TestMissingData(t *testing.T) {
 	t.Run("Returns 404 on missing data", func(t *testing.T) {
 		// Suppose to return 404 since Miss is not in date/Miss
-		request := newGetTransactionsRequest("Miss")
+		request := newGetTickerRequest("Miss")
 		response := httptest.NewRecorder()
 
 		server.ServeHTTP(response, request)
@@ -58,7 +71,7 @@ func TestMissingData(t *testing.T) {
 // 	server := &TicketServer{}
 
 // 	t.Run("Returns map of data on a given date", func(t *testing.T) {
-// 		request := newGetTransactionsRequest("06")
+// 		request := newGetTickerRequest("06")
 // 		response := httptest.NewRecorder()
 
 // 		server.ServeHTTP(response, request)
@@ -70,7 +83,7 @@ func TestMissingData(t *testing.T) {
 // 	})
 // }
 
-func TestGETTransactions(t *testing.T) {
+func TestGetTicker(t *testing.T) {
 	tests := []struct {
 		name               string
 		date               string
@@ -93,7 +106,7 @@ func TestGETTransactions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			request := newGetTransactionsRequest(tt.date)
+			request := newGetTickerRequest(tt.date)
 			response := httptest.NewRecorder()
 
 			server.ServeHTTP(response, request)
@@ -140,7 +153,7 @@ func assertStatus(t *testing.T, i1, i2 int) {
 	}
 }
 
-func newGetTransactionsRequest(date string) *http.Request {
+func newGetTickerRequest(date string) *http.Request {
 	request, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("date/%s", date), nil)
 	return request
 }
@@ -153,17 +166,35 @@ func assertResponseBody(t testing.TB, got, want string) {
 }
 
 func TestProcessingAndRetrieving(t *testing.T) {
-	store := NewInMemoryTransactionStore()
+	store := NewInMemoryTickerStore()
 	server := TicketServer{store}
 
+	usr := Ticker{
+		Symbol: "MSFT",
+	}
+
+	body, _ := json.Marshal(usr)
+
+	year_month := "22-06"
 	// POST
-	req, _ := http.NewRequest(http.MethodPost, "/date/010", nil)
+	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("/date/%s", year_month), bytes.NewBuffer(body))
+
+	// Close response stream, once response is read.
+	defer req.Body.Close()
+
+	ctx, cancel := context.WithTimeout(req.Context(), 1*time.Millisecond)
+	defer cancel()
+
+	req = req.WithContext(ctx)
+
 	server.ServeHTTP(response, req)
 
+	response_integration := httptest.NewRecorder()
+
 	// GET
-	server.ServeHTTP(httptest.NewRecorder(), newGetTransactionsRequest("010"))
+	server.ServeHTTP(response_integration, newGetTickerRequest(year_month))
 
 	assertStatus(t, response.Code, http.StatusAccepted)
 
-	assertResponseBody(t, httptest.NewRecorder().Body.String(), "")
+	assertResponseBody(t, response_integration.Body.String(), usr.Symbol)
 }

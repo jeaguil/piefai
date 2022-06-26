@@ -40,6 +40,7 @@ func (i *InMemoryTransactionStore) GetJSONTransactions() []Transaction {
 }
 
 func (i *InMemoryTransactionStore) ProcessTransaction(t Transaction) {
+	i.store[t.Ticker] = "MSFT"
 }
 
 type InMemoryTransactionStore struct {
@@ -50,8 +51,8 @@ func main() {
 	c := polygon.New(config.GetAPIKey())
 	_ = c
 
-	server := &TicketServer{NewInMemoryTickerStore()}
-	// server := NewTransactionServr(NewInMemoryTransactionStore())
+	// server := &TicketServer{NewInMemoryTickerStore()}
+	server := NewTransactionServr(NewInMemoryTransactionStore())
 	log.Print("Local server on port :5000")
 	log.Fatal(http.ListenAndServe(":5000", server))
 }

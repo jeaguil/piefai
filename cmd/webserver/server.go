@@ -31,7 +31,7 @@ type Transaction struct {
 // TransactionStore stores information all all transactions made.
 type TransactionStore interface {
 	GetJSONTransactions() []Transaction
-	ProcessTransaction(t Transaction) string
+	ProcessTransaction(t Transaction)
 }
 
 type TransactionServer struct {
@@ -59,7 +59,16 @@ func (t *TransactionServer) transactionHandler(w http.ResponseWriter, r *http.Re
 }
 
 func (t *TransactionServer) settleHandler(w http.ResponseWriter, r *http.Request) {
+	req_body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	strbdy := string(req_body)
+	var tr_set Transaction
+	tr_set.Ticker = strbdy
 
+	t.store.ProcessTransaction(tr_set)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (t *TicketServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {

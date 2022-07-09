@@ -9,6 +9,10 @@ import (
 	"strings"
 )
 
+/*
+TICKER STORE
+*/
+
 type Ticker struct {
 	Symbol string `json:"symbol"`
 }
@@ -28,47 +32,13 @@ type Transaction struct {
 	Ticker string
 }
 
-// TransactionStore stores information all all transactions made.
-type TransactionStore interface {
-	GetJSONTransactions() []Transaction
-	ProcessTransaction(t Transaction)
+func (i *InMemoryTickerStore) GetTicker(date string) string {
+	month := strings.TrimPrefix(date, "date/")
+	return i.store[month]
 }
 
-type TransactionServer struct {
-	store TransactionStore
-	http.Handler
-}
-
-func NewTransactionServr(store TransactionStore) *TransactionServer {
-	t := new(TransactionServer)
-
-	t.store = store
-
-	router := http.NewServeMux()
-	router.Handle("/transactions", http.HandlerFunc(t.transactionHandler))
-	router.Handle("/settle", http.HandlerFunc(t.settleHandler))
-
-	t.Handler = router
-
-	return t
-}
-
-func (t *TransactionServer) transactionHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "application/json")
-	json.NewEncoder(w).Encode(t.store.GetJSONTransactions())
-}
-
-func (t *TransactionServer) settleHandler(w http.ResponseWriter, r *http.Request) {
-	req_body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	strbdy := string(req_body)
-	var tr_set Transaction
-	tr_set.Ticker = strbdy
-
-	t.store.ProcessTransaction(tr_set)
-	w.WriteHeader(http.StatusOK)
+func (i *InMemoryTickerStore) ProcessTicker(date, transaction string) {
+	i.store[date] = transaction
 }
 
 func (t *TicketServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -102,4 +72,63 @@ func (t *TicketServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, transaction)
 	}
 
+}
+
+/*
+TRANSACTION STORE
+*/
+
+// TransactionStore stores information all all transactions made.
+type TransactionStore interface {
+	GetJSONTransactions() []Transaction
+	ProcessTransaction(t Transaction)
+}
+
+type TransactionServer struct {
+	store TransactionStore
+	http.Handler
+}
+
+func NewTransactionServer(store TransactionStore) *TransactionServer {
+	t := new(TransactionServer)
+
+	t.store = store
+
+	router := http.NewServeMux()
+	router.Handle("/transactions", http.HandlerFunc(t.transactionHandler))
+	router.Handle("/settle", http.HandlerFunc(t.settleHandler))
+
+	t.Handler = router
+
+	return t
+}
+
+func (t *TransactionServer) transactionHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	json.NewEncoder(w).Encode(t.store.GetJSONTransactions())
+}
+
+func (t *TransactionServer) settleHandler(w http.ResponseWriter, r *http.Request) {
+	req_body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	strbdy := string(req_body)
+	var tr_set Transaction
+	tr_set.Ticker = strbdy
+
+	t.store.ProcessTransaction(tr_set)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (i *InMemoryTransactionStore) GetJSONTransactions() []Transaction {
+	var t []Transaction
+	for ticker := range i.store {
+		t = append(t, Transaction{ticker})
+	}
+	return t
+}
+
+func (i *InMemoryTransactionStore) ProcessTransaction(t Transaction) {
+	i.store[t.Ticker] = "MSFT"
 }

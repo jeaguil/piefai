@@ -5,6 +5,8 @@ server := &TicketServer{NewInMemoryTickerStore()}
 Handles func for TickerStore:
 	GetTicker
 	ProcessTicker
+
+Transaction Server uses the same func of these tests.
 */
 
 package main
